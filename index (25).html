@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>마니또 매칭 퀴즈</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: linear-gradient(160deg, #141414 0%, #1f1f1f 100%);
+    font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    color: #f5f5f5;
+    padding: 32px 16px;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  h1 { text-align: center; font-size: 26px; margin-bottom: 4px; letter-spacing: -0.5px; }
+  .subtitle {
+    text-align: center; font-size: 14px; color: #9a9a9a;
+    margin-bottom: 26px; line-height: 1.5;
+  }
+  .card {
+    background: #232323; border-radius: 10px; padding: 16px;
+    margin-bottom: 12px; border: 1px solid #333;
+  }
+  .card label { display: block; font-size: 13px; color: #9a9a9a; margin-bottom: 8px; }
+  .row {
+    display: flex; align-items: center; gap: 12px;
+    background: #232323; border-radius: 10px; padding: 12px 16px;
+    margin-bottom: 10px; border: 1px solid #333;
+  }
+  .row .giver { flex: 0 0 90px; font-weight: 700; font-size: 15px; }
+  .row .arrow { color: #666; font-size: 14px; }
+  select, input[type=password] {
+    flex: 1; width: 100%; padding: 10px 12px; font-size: 14px;
+    border-radius: 8px; border: 1px solid #3a3a3a;
+    background: #2f2f2f; color: #f5f5f5;
+  }
+  button {
+    width: 100%; padding: 14px; font-size: 15px; font-weight: 600;
+    border: none; border-radius: 8px; background: #e50914; color: white; cursor: pointer;
+  }
+  button:hover { background: #f6121d; }
+  button:disabled { background: #555; cursor: not-allowed; }
+  button.secondary { background: #3a3a3a; }
+  button.secondary:hover { background: #4a4a4a; }
+  .msg-error { color: #ff6b6b; font-size: 13px; margin: 8px 0 0; }
+  .msg-hint { color: #9a9a9a; font-size: 12px; margin: 8px 0 0; }
+  .locked { opacity: 0.4; pointer-events: none; }
+  .hidden { display: none; }
+  .done-box { text-align: center; padding: 32px 20px; }
+  .done-box h2 { margin: 0 0 8px; font-size: 20px; }
+  .done-box p { color: #9a9a9a; font-size: 13px; line-height: 1.6; margin: 0; }
+  .admin-link {
+    background: none; border: none; color: #666; font-size: 12px;
+    cursor: pointer; text-decoration: underline; width: auto; padding: 0;
+  }
+  .admin-link:hover { background: none; color: #999; }
+  .sub-head { display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+  .sub-name { font-weight: 700; font-size: 16px; }
+  .sub-time { color: #9a9a9a; font-size: 12px; margin-left: 10px; font-weight: 400; }
+  .sub-score { font-weight: 700; font-size: 18px; }
+  .sub-score.perfect { color: #4caf50; }
+  .sub-detail { margin-top: 12px; border-top: 1px solid #333; padding-top: 12px; }
+  .d-row { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; }
+  .d-row.ok { color: #4caf50; }
+  .d-row.no { color: #ff6b6b; }
+  .small-btn { margin-top: 12px; padding: 10px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ─────────── 참가자 화면 ─────────── -->
+  <div id="quizView">
+    <h1>🎯 마니또 매칭 퀴즈</h1>
+    <div class="subtitle">누가 누구를 챙겨줬는지 맞혀보세요.<br>제출은 <b>1인 1회</b>만 가능하고, 점수와 결과는 관리자만 볼 수 있어요.</div>
+
+    <div id="quizForm">
+      <div class="card">
+        <label>내 이름</label>
+        <select id="myName">
+          <option value="">-- 이름 선택 --</option>
+        </select>
+        <p class="msg-hint hidden" id="checkingMsg">제출 여부 확인 중...</p>
+        <p class="msg-error hidden" id="alreadyMsg">이미 제출하셨어요. 제출은 1인 1회만 가능합니다.</p>
+      </div>
+
+      <div id="rowsWrap">
+        <div id="rows"></div>
+        <p class="msg-error hidden" id="quizError" style="text-align:center;"></p>
+        <button id="submitBtn" style="margin-top:14px;">제출하기</button>
+      </div>
+    </div>
+
+    <div class="card done-box hidden" id="doneBox">
+      <h2>✅ 제출 완료</h2>
+      <p id="doneMsg">답안이 관리자에게 전달되었습니다.<br>결과는 관리자가 확인 후 발표할 예정이에요. 🤫</p>
+    </div>
+
+    <p style="text-align:center; margin-top:28px;">
+      <button class="admin-link" id="goAdmin">관리자 확인</button>
+    </p>
+  </div>
+
+  <!-- ─────────── 관리자 화면 ─────────── -->
+  <div id="adminView" class="hidden">
+    <h1>🔐 관리자 — 제출 현황</h1>
+    <div class="subtitle">점수와 상세 답안은 이 화면에서만 확인할 수 있어요.</div>
+
+    <div class="card" id="pwBox">
+      <label>관리자 비밀번호</label>
+      <input type="password" id="pwInput" placeholder="비밀번호 입력">
+      <p class="msg-error hidden" id="pwError">비밀번호가 올바르지 않습니다.</p>
+      <button id="pwBtn" style="margin-top:12px;">확인</button>
+    </div>
+
+    <div id="adminPanel" class="hidden">
+      <button class="secondary" id="refreshBtn" style="margin-bottom:16px;">🔄 새로고침</button>
+      <p class="msg-hint" id="subCount" style="margin:0 0 12px;"></p>
+      <div id="subList"></div>
+    </div>
+
+    <button class="secondary" id="backBtn" style="margin-top:20px;">← 퀴즈 화면으로</button>
+  </div>
+
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://cdn.jsdelivr.net/npm/firebase@9.23.0/firebase-app-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@9.23.0/firebase-database-compat.js"></script>
+<script>
+  /* ═══════════════════════════════════════════════════════
+     ① Firebase 설정 — 본인 프로젝트 값으로 교체하세요!
+     console.firebase.google.com → 프로젝트 설정 → 웹 앱 → SDK 설정
+     ═══════════════════════════════════════════════════════ */
+  const firebaseConfig = {
+    apiKey: "AIzaSyAslVQv3ALOXL4_VdFq_f7eohQHjt3aoRo",
+    authDomain: "alo-manitoquiz.firebaseapp.com",
+    databaseURL: "https://alo-manitoquiz-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "alo-manitoquiz",
+    storageBucket: "alo-manitoquiz.firebasestorage.app",
+    messagingSenderId: "772510719405",
+    appId: "1:772510719405:web:9e561be3537f2ac24c5524",
+    measurementId: "G-ZK9SE3Z2QJ"
+  };
+
+  /* ② 정답 (base64 인코딩 — 소스 보기로 바로 노출되지 않게) */
+  const ANSWER_B64 = "eyLsnKDsnKTqsr0iOiLquYDshozsl7AiLCLqs73tmJzsoJUiOiLtlZjrj5nshJ0iLCLsmKTsp4TsmrAiOiLrsJXsooXtlZgiLCLquYDrr7ztmJwiOiLsnbTsp4DtlokiLCLtlZjrj5nshJ0iOiLsi6DsoJXquIgiLCLsnbTsp4DtlokiOiLquYDsmqnsp4AiLCLquYDshozsl7AiOiLsl7zquLjtmIQiLCLquYDsmqnsp4AiOiLquYDrr7ztmJwiLCLrrLjshJ3snKQiOiLsmKTsp4TsmrAiLCLrsJXsiJjsp4QiOiLtlZzsmIjsiqwiLCLsi6DsoJXquIgiOiLrrLjshJ3snKQiLCLsl7zquLjtmIQiOiLqs73tmJzsoJUiLCLsnbTtg5zsmIEiOiLsnKDsnKTqsr0iLCLtlZzsmIjsiqwiOiLrsJXsiJjsp4QiLCLrsJXsooXtlZgiOiLsnbTtg5zsmIEifQ==";
+
+  /* ③ 관리자 비밀번호: manito2026
+     변경 방법: 브라우저 콘솔에서 btoa("새비밀번호") 실행 후 결과값으로 교체 */
+  const ADMIN_PW_B64 = "bWFuaXRvMjAyNg==";
+
+  const decodeB64 = (b64) =>
+    new TextDecoder().decode(Uint8Array.from(atob(b64), c => c.charCodeAt(0)));
+
+  const ANSWERS = JSON.parse(decodeB64(ANSWER_B64));
+  const NAMES = Object.keys(ANSWERS);
+  const TOTAL = NAMES.length;
+
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  /* ─── Firebase 연결 (실패해도 화면은 정상 표시) ─── */
+  let db = null;
+  let dbError = '';
+  try {
+    if (typeof firebase === 'undefined') {
+      dbError = 'Firebase 스크립트를 불러오지 못했어요. 실제 사이트(GitHub Pages)에서 열어주세요.';
+    } else if (firebaseConfig.apiKey.indexOf('여기에') !== -1) {
+      dbError = 'Firebase 설정이 아직 입력되지 않았어요. index.html의 firebaseConfig를 채워주세요.';
+    } else if (!firebaseConfig.databaseURL || firebaseConfig.databaseURL.indexOf('여기에') !== -1) {
+      dbError = 'databaseURL이 아직 입력되지 않았어요. Firebase에서 Realtime Database를 만들고 그 주소를 index.html에 붙여넣어주세요.';
+    } else {
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.database();
+    }
+  } catch (e) {
+    dbError = 'Firebase 연결에 실패했어요. firebaseConfig 값을 확인해주세요.';
+  }
+
+  /* ─── 화면 요소 ─── */
+  const $ = (id) => document.getElementById(id);
+  const quizView = $('quizView'), adminView = $('adminView');
+  const myNameSelect = $('myName'), rowsEl = $('rows'), rowsWrap = $('rowsWrap');
+  const submitBtn = $('submitBtn'), quizError = $('quizError');
+  const alreadyMsg = $('alreadyMsg'), checkingMsg = $('checkingMsg');
+  const doneBox = $('doneBox'), quizForm = $('quizForm');
+
+  /* ─── 참가자 화면 구성 ─── */
+  shuffle(NAMES).forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    myNameSelect.appendChild(opt);
+  });
+
+  const receiverOptions = shuffle(NAMES);
+  shuffle(NAMES).forEach(giver => {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.dataset.giver = giver;
+    row.innerHTML = '<div class="giver"></div><div class="arrow">→</div>';
+    row.querySelector('.giver').textContent = giver;
+    const select = document.createElement('select');
+    const empty = document.createElement('option');
+    empty.value = ''; empty.textContent = '-- 선택 --';
+    select.appendChild(empty);
+    receiverOptions.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      select.appendChild(opt);
+    });
+    row.appendChild(select);
+    rowsEl.appendChild(row);
+  });
+
+  /* ─── DB 미연결 시 안내 배너 ─── */
+  if (dbError) {
+    const banner = document.createElement('div');
+    banner.className = 'card';
+    banner.style.cssText = 'border-color:#a33;color:#ffb3b3;font-size:13px;line-height:1.6;';
+    banner.textContent = '⚠️ ' + dbError + ' (미리보기에서는 화면만 확인할 수 있고, 제출은 실제 사이트에서 가능해요.)';
+    quizView.insertBefore(banner, quizForm);
+  }
+
+  /* ─── 이름 선택 시 중복 제출 확인 ─── */
+  myNameSelect.addEventListener('change', async () => {
+    alreadyMsg.classList.add('hidden');
+    rowsWrap.classList.remove('locked');
+    const name = myNameSelect.value;
+    if (!name || !db) return;
+    checkingMsg.classList.remove('hidden');
+    try {
+      const snap = await db.ref('submissions/' + name).get();
+      if (snap.exists()) {
+        alreadyMsg.classList.remove('hidden');
+        rowsWrap.classList.add('locked');
+      }
+    } catch (e) {
+      /* 네트워크 오류 시 제출 단계에서 다시 확인 */
+    }
+    checkingMsg.classList.add('hidden');
+  });
+
+  /* ─── 제출 ─── */
+  submitBtn.addEventListener('click', async () => {
+    quizError.classList.add('hidden');
+    const myName = myNameSelect.value;
+    if (!myName) {
+      quizError.textContent = '본인 이름을 먼저 선택해주세요.';
+      quizError.classList.remove('hidden');
+      return;
+    }
+    const rows = document.querySelectorAll('.row');
+    let allAnswered = true, score = 0;
+    const detail = [];
+    rows.forEach(row => {
+      const giver = row.dataset.giver;
+      const picked = row.querySelector('select').value;
+      if (!picked) allAnswered = false;
+      const correct = picked === ANSWERS[giver];
+      if (correct) score++;
+      detail.push({ giver, picked, correct });
+    });
+    if (!allAnswered) {
+      quizError.textContent = '아직 답하지 않은 항목이 있어요. 모두 선택해주세요.';
+      quizError.classList.remove('hidden');
+      return;
+    }
+    if (!db) {
+      quizError.textContent = dbError || '데이터베이스가 연결되지 않아 제출할 수 없어요.';
+      quizError.classList.remove('hidden');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = '제출 중...';
+    try {
+      const ref = db.ref('submissions/' + myName);
+      const snap = await ref.get();
+      if (snap.exists()) {
+        alreadyMsg.classList.remove('hidden');
+        rowsWrap.classList.add('locked');
+        submitBtn.disabled = false;
+        submitBtn.textContent = '제출하기';
+        return;
+      }
+      await ref.set({
+        name: myName,
+        time: new Date().toISOString(),
+        score: score,
+        total: TOTAL,
+        detail: detail
+      });
+      quizForm.classList.add('hidden');
+      $('doneMsg').innerHTML = myName + ' 님의 답안이 관리자에게 전달되었습니다.<br>결과는 관리자가 확인 후 발표할 예정이에요. 🤫';
+      doneBox.classList.remove('hidden');
+    } catch (e) {
+      quizError.textContent = '제출 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.';
+      quizError.classList.remove('hidden');
+      submitBtn.disabled = false;
+      submitBtn.textContent = '제출하기';
+    }
+  });
+
+  /* ─── 관리자 화면 ─── */
+  $('goAdmin').addEventListener('click', () => {
+    quizView.classList.add('hidden');
+    adminView.classList.remove('hidden');
+  });
+  $('backBtn').addEventListener('click', () => {
+    adminView.classList.add('hidden');
+    quizView.classList.remove('hidden');
+  });
+
+  $('pwBtn').addEventListener('click', tryAuth);
+  $('pwInput').addEventListener('keydown', e => { if (e.key === 'Enter') tryAuth(); });
+
+  function tryAuth() {
+    let ok = false;
+    try { ok = btoa($('pwInput').value) === ADMIN_PW_B64; } catch (e) {}
+    if (ok) {
+      $('pwBox').classList.add('hidden');
+      $('adminPanel').classList.remove('hidden');
+      loadSubs();
+    } else {
+      $('pwError').classList.remove('hidden');
+    }
+  }
+
+  $('refreshBtn').addEventListener('click', loadSubs);
+
+  async function loadSubs() {
+    const listEl = $('subList');
+    if (!db) {
+      listEl.innerHTML = '<div class="card" style="text-align:center;color:#ff6b6b;font-size:13px;">' + (dbError || '데이터베이스가 연결되지 않았어요.') + '</div>';
+      return;
+    }
+    listEl.innerHTML = '<div class="card" style="text-align:center;color:#9a9a9a;">불러오는 중...</div>';
+    let subs = [];
+    try {
+      const snap = await db.ref('submissions').get();
+      if (snap.exists()) subs = Object.values(snap.val());
+    } catch (e) {
+      listEl.innerHTML = '<div class="card" style="text-align:center;color:#ff6b6b;">데이터를 불러오지 못했어요. 새로고침을 눌러주세요.</div>';
+      return;
+    }
+    subs.sort((a, b) => b.score - a.score || a.time.localeCompare(b.time));
+    $('subCount').textContent = '제출 ' + subs.length + ' / ' + TOTAL + '명';
+    listEl.innerHTML = '';
+    if (subs.length === 0) {
+      listEl.innerHTML = '<div class="card" style="text-align:center;color:#9a9a9a;">아직 제출된 답안이 없습니다.</div>';
+      return;
+    }
+    subs.forEach((s, i) => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      const head = document.createElement('div');
+      head.className = 'sub-head';
+      const left = document.createElement('div');
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'sub-name';
+      nameSpan.textContent = (i === 0 ? '🏆 ' : (i + 1) + '위 ') + s.name;
+      const timeSpan = document.createElement('span');
+      timeSpan.className = 'sub-time';
+      timeSpan.textContent = new Date(s.time).toLocaleString('ko-KR');
+      left.appendChild(nameSpan);
+      left.appendChild(timeSpan);
+      const scoreSpan = document.createElement('span');
+      scoreSpan.className = 'sub-score' + (s.score === s.total ? ' perfect' : '');
+      scoreSpan.textContent = s.score + ' / ' + s.total;
+      head.appendChild(left);
+      head.appendChild(scoreSpan);
+      card.appendChild(head);
+
+      const detailDiv = document.createElement('div');
+      detailDiv.className = 'sub-detail hidden';
+      (s.detail || []).forEach(d => {
+        const dr = document.createElement('div');
+        dr.className = 'd-row ' + (d.correct ? 'ok' : 'no');
+        const l = document.createElement('span');
+        l.textContent = d.giver + ' → ' + d.picked;
+        const r = document.createElement('span');
+        r.textContent = d.correct ? '✓' : '✗ (정답: ' + ANSWERS[d.giver] + ')';
+        dr.appendChild(l); dr.appendChild(r);
+        detailDiv.appendChild(dr);
+      });
+      const delBtn = document.createElement('button');
+      delBtn.className = 'secondary small-btn';
+      delBtn.textContent = '이 제출 삭제 (재응시 허용)';
+      delBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!confirm(s.name + ' 님의 제출을 삭제할까요? 다시 응시할 수 있게 됩니다.')) return;
+        try { await db.ref('submissions/' + s.name).remove(); } catch (err) {}
+        loadSubs();
+      });
+      detailDiv.appendChild(delBtn);
+      card.appendChild(detailDiv);
+
+      head.addEventListener('click', () => detailDiv.classList.toggle('hidden'));
+      listEl.appendChild(card);
+    });
+  }
+</script>
+</body>
+</html>
